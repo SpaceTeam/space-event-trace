@@ -1,0 +1,142 @@
+{% extends "layout.html" %}
+{% block body %}
+<h1>Admin</h1>
+
+<p>
+<h3>Contact export</h3>
+<strong>Note:</strong> These dates are inclusive. <br>
+This means they start at 00:00 and end at 23:59.
+<form action="{{url_for('contacts_csv')}}" method="get" class="row g-3 mt-2">
+    <div class="col-md-6">
+        <label for="startDate" class="form-label">Start</label>
+        <input type="date" class="form-control" id="startDate" name="startDate" onchange="changeListener()">
+    </div>
+    <div class="col-md-6">
+        <label for="endDate" class="form-label">End</label>
+        <input type="date" class="form-control" id="endDate" name="endDate" onchange="changeListener()">
+    </div>
+    <div class="col-12 text-danger" id="error" hidden>
+    </div>
+    <div class="col-12">
+        <button class="btn btn-primary" id="export" disabled onclick="">Export CSV</button>
+    </div>
+</form>
+</p>
+
+<script>
+    const startEl = document.getElementById("startDate");
+    const endEl = document.getElementById("endDate");
+    const exportEl = document.getElementById("export");
+    const errorEl = document.getElementById("error");
+
+    function changeListener() {
+        if (startEl.valueAsDate == null || endEl.valueAsDate == null) {
+            errorEl.hidden = true;
+            exportEl.disabled = true;
+            return;
+        }
+
+        if (startEl.valueAsDate > endEl.valueAsDate) {
+            errorEl.innerText = "The end date must be after the start date.";
+            errorEl.hidden = false;
+            exportEl.disabled = true;
+            return;
+        }
+
+        errorEl.innerText = "";
+        errorEl.hidden = true;
+        exportEl.disabled = false;
+    }
+</script>
+
+<p>
+<h3 class="mt-5">Smart contact export</h3>
+<form action="{{url_for('smart_contacts_csv')}}" method="get" class="row g-3 mt-2">
+    <div class="col-md-4">
+        <label for="smartEndDate" class="form-label">Start</label>
+        <input type="date" class="form-control" id="smartStartDate" name="startDate" onchange="smartChangeListener()">
+    </div>
+    <div class="col-md-8">
+        <label for="infectedId" class="form-label">Infected Person</label>
+        <select id="infectedId" name="infectedId" class="form-select" aria-label="Default select example"
+            onchange="smartChangeListener()">
+            <option value="" selected>Open this select menu</option>
+            {% for user in users%}
+            <option value="{{user.id}}">{{user.get_full_name()}}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+
+    <div class="col-12">
+        <button class=" btn btn-primary" id="smartExport" disabled onclick="">Export CSV</button>
+    </div>
+</form>
+</p>
+
+<script>
+    const infectedEl = document.getElementById("infectedId");
+    const smartStartEl = document.getElementById("smartStartDate");
+    const smartExportEl = document.getElementById("smartExport");
+
+    function smartChangeListener() {
+        if (infectedEl.value == "" || smartStartEl.valueAsDate == null) {
+            smartExportEl.disabled = true;
+            return;
+        }
+        smartExportEl.disabled = false;
+    }
+</script>
+
+
+
+<h3>Check ins per hour</h3>
+See when people check in.
+<div>
+    <canvas id="myChart"></canvas>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+
+    // TODO: Oh boy this is definitly one of the more ugly code parts I have 
+    // ever  written
+    const labels = [
+        {% for item in checkin_per_hour['labels'] %}
+    '{{item}}',
+        {% endfor %}
+    ];
+
+    const data = {
+        labels: labels,
+        datasets: [{
+            label: 'Check ins',
+            backgroundColor: '#2da44e',
+            borderColor: '#2da44e',
+            cubicInterpolationMode: 'monotone',
+            data: [
+                {% for item in checkin_per_hour['data'] %}
+    {{ item }},
+        {% endfor %}
+            ],
+        }]
+    };
+
+    const config = {
+        type: 'line',
+        data: data,
+        options: {}
+    };
+
+    const myChart = new Chart(
+        document.getElementById('myChart'),
+        config
+    );
+</script>
+
+<p>
+<h3 class="mt-5">Info for nerds</h3>
+The server thinks it is: {{now}}
+</p>
+
+
+{% endblock %}

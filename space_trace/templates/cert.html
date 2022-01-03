@@ -1,0 +1,42 @@
+{% extends "layout.html" %}
+{% block body %}
+<h1>Certificate</h1>
+You can only upload images of QR codes or PDFs.
+
+<form action="/cert" method="post" enctype="multipart/form-data" class="mb-5">
+    <div class="mb-3 mt-2">
+        <input class="form-control" type="file" name="file" id="file" onchange="enableForm()">
+    </div>
+    <div class="mb-3 form-check">
+        <input type="checkbox" class="form-check-input" id="checkStorage" onchange="enableForm()">
+        <label class="form-check-label" for="exampleCheck1">I agree that the
+            expiration date of my vaccination certificate will be stored on
+            TU Wien Space Team Servers and that I read and agree to the
+            <a href="/static/Zustimmungserklaerung.pdf">Zustimmungserklärung</a>.
+        </label>
+    </div>
+    <input class="btn btn-primary w-100" type=submit id="submit" value=Upload disabled>
+</form>
+
+<script>
+    const fileEl = document.getElementById("file");
+    const checkEl = document.getElementById("checkStorage");
+    const submitEl = document.getElementById("submit");
+    function enableForm() {
+        if (checkEl.checked && fileEl.files.length != 0) {
+            submitEl.disabled = false;
+        } else {
+            submitEl.disabled = true;
+        }
+    }
+</script>
+
+{% if is_vaccinated %}
+<h5>Your vaccination status is valid till {{user.vaccinated_till}}.</h5>
+<form action="{{url_for('delete_cert')}}" method="post">
+    <button class="btn btn-outline-danger">Delete</button>
+</form>
+{% endif %}
+
+
+{% endblock %}
