@@ -1,0 +1,12 @@
+[Unit]
+Description=Tracing service for Space Team Events
+After=network.target
+
+[Service]
+User=qr-registration
+WorkingDirectory=/home/qr-registration/space-event-trace
+ExecStart=/bin/bash -c 'source /home/qr-registration/space-event-trace/venv/bin/activate; gunicorn -w 24 --bind 0.0.0.0:5000 space_trace:app'
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
