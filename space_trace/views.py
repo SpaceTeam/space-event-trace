@@ -98,7 +98,7 @@ def require_2g_plus(f):
 
 def get_active_visit(user: User) -> Visit:
     # A visit that is less than 12h old
-    cutoff_timestamp = datetime.now() - timedelta(hours=12)
+    cutoff_timestamp = datetime.now() - timedelta(hours=3)
     return Visit.query.filter(
         db.and_(Visit.user == user.id, Visit.timestamp > cutoff_timestamp)
     ).first()
@@ -383,7 +383,7 @@ def statistic():
     total_users = User.query.count()
     total_visits = Visit.query.count()
 
-    cutoff_timestamp = datetime.now() - timedelta(hours=12)
+    cutoff_timestamp = datetime.now() - timedelta(hours=3)
     active_visits = Visit.query.filter(Visit.timestamp > cutoff_timestamp).count()
 
     active_users = None
