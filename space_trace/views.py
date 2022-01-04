@@ -77,8 +77,15 @@ def require_2g_plus(f):
             flash("You need to upload a test certificate.", "info")
             had_error = True
 
-        elif user.tested_till < datetime.now() + timedelta(hours=6):
+        elif user.tested_till < datetime.now():
             flash("Your test expired, you need to upload a new one.", "info")
+            had_error = True
+
+        elif user.tested_till < datetime.now() + timedelta(hours=6):
+            flash(
+                "Your test is going to expire in less than 6hrs, you need to upload a new one.",
+                "info",
+            )
             had_error = True
 
         if had_error:
