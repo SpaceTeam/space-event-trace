@@ -272,11 +272,11 @@ def contacts_csv():
     # start of the day (0:00) but end should point to the last minute so if
     # both point to the same day one whole day gets selected.
     # Actually start should point to 12h before that because members that only
-    # logged in 12h bevore are still considered as in the HQ.
+    # logged in 12h before are still considered as in the HQ.
     start = start - timedelta(hours=12)
     end = end + timedelta(hours=24)
 
-    # Get all email adresses of people logged in that time period
+    # Get all email addresses of people logged in that time period
     users = (
         db.session.query(User)
         .filter(User.id == Visit.user)
@@ -323,7 +323,7 @@ def smart_contacts_csv():
     # start of the day (0:00) but end should point to the last minute so if
     # both point to the same day one whole day gets selected.
     # Actually start should point to 12h before that because members that only
-    # logged in 12h bevore are still considered as in the HQ.
+    # logged in 12h before are still considered as in the HQ.
     start = start - timedelta(hours=12)
 
     # Get all contacts of the infected
@@ -431,6 +431,7 @@ def add_login():
     req = prepare_flask_request(request)
     auth = init_saml_auth(req)
 
+    # TODO: Move this to config
     return_to = "https://gv.tust.at/"
     sso_built_url = auth.login(return_to)
     session["AuthNRequestID"] = auth.get_last_request_id()
