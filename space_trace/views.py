@@ -15,9 +15,9 @@ from werkzeug.exceptions import InternalServerError
 
 from space_trace import app, db
 from space_trace.certificates import (
-    detect_and_attach_cert,
+    detect_and_attach_test_cert,
+    detect_and_attach_vaccine_cert,
 )
-from space_trace.jokes import get_daily_joke
 from space_trace.models import User, Visit
 
 
@@ -64,12 +64,24 @@ def require_admin(f):
     return wrapper
 
 
-def require_vaccinated(f):
+def require_2g_plus(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
         user = flask.g.user
+        had_error = False
         if user.vaccinated_till is None or user.vaccinated_till < date.today():
             flash("You need to upload a vaccination certificate.", "info")
+            had_error = True
+
+        if user.tested_till is None:
+            flash("You need to upload a test certificate.", "info")
+            had_error = True
+
+        elif user.tested_till < datetime.now() + timedelta(hours=6):
+            flash("Your test expired, you need to upload a new one.", "info")
+            had_error = True
+
+        if had_error:
             return redirect(url_for("cert"))
 
         return f(*args, **kwargs)
@@ -87,7 +99,7 @@ def get_active_visit(user: User) -> Visit:
 
 @app.get("/")
 @require_login
-@require_vaccinated
+@require_2g_plus
 def home():
     user: User = flask.g.user
 
@@ -96,20 +108,11 @@ def home():
     if visit is not None:
         visit_deadline = visit.timestamp + timedelta(hours=12)
 
-    joke = None
-    if user.email in app.config["JOKE_TARGETS"]:
-        joke = get_daily_joke()
-    elif user.email in app.config["DISAPPOINTED_USERS"]:
-        joke = "So sorry that you cannot have another developer. "
-        "Currently all of our developers are busy fixing edge-cases they "
-        "forgot they put in last night at 3am."
-
     expires_in = user.vaccinated_till - date.today()
     if expires_in < timedelta(days=21):
         color = "warning" if expires_in > timedelta(days=7) else "danger"
         flash(
-            "Your vaccination certificate will expire "
-            f"in {expires_in.days} days.",
+            "Your vaccination certificate will expire " f"in {expires_in.days} days.",
             color,
         )
 
@@ -118,13 +121,13 @@ def home():
         user=user,
         visit=visit,
         visit_deadline=visit_deadline,
-        joke=joke,
+        joke="",
     )
 
 
 @app.post("/")
 @require_login
-@require_vaccinated
+@require_2g_plus
 def add_visit():
     user: User = flask.g.user
 
@@ -147,11 +150,17 @@ def cert():
     user: User = flask.g.user
 
     is_vaccinated = (
-        user.vaccinated_till is not None
-        and user.vaccinated_till > date.today()
+        user.vaccinated_till is not None and user.vaccinated_till > date.today()
     )
 
-    return render_template("cert.html", user=user, is_vaccinated=is_vaccinated)
+    is_tested = (
+        user.tested_till is not None
+        and user.tested_till > datetime.now() + timedelta(hours=6)
+    )
+
+    return render_template(
+        "cert.html", user=user, is_vaccinated=is_vaccinated, is_tested=is_tested
+    )
 
 
 @app.post("/cert")
@@ -159,18 +168,34 @@ def cert():
 def upload_cert():
     user: User = flask.g.user
 
-    file = request.files["file"]
+    test_file = request.files["testFile"]
+    vaccine_file = request.files["vaccineFile"]
+
     # If the user does not select a file, the browser submits an
     # empty file without a filename.
-    if file.filename == "":
-        flash("No file seleceted", "warning")
-        return redirect(request.url)
+    if vaccine_file.filename == "" and test_file.filename == "":
+        flash("You must at least upload one file", "danger")
+        return redirect(url_for("cert"))
 
     try:
-        detect_and_attach_cert(file, user)
-    except IntegrityError:
-        flash("This certificate was already uploaded", "warning")
-        return redirect(request.url)
+        new_test = test_file.filename != ""
+        new_vaccine = vaccine_file.filename != ""
+        if new_vaccine:
+            detect_and_attach_vaccine_cert(vaccine_file, user)
+
+        if new_test:
+            detect_and_attach_test_cert(test_file, user)
+
+        # Update the user
+        db.session.query(User).filter(User.id == user.id).update(
+            {
+                "vaccinated_till": user.vaccinated_till,
+                "tested_till": user.tested_till,
+            }
+        )
+        db.session.commit()
+        user = User.query.filter(User.id == user.id).first()
+
     except Exception as e:
         if hasattr(e, "message"):
             message = e.message
@@ -179,9 +204,11 @@ def upload_cert():
         flash(message, "danger")
         return redirect(request.url)
 
+    message_vaccinated = "a valid vaccination certificate" if new_vaccine else ""
+    message_and = " and " if new_vaccine and new_test else ""
+    message_tested = "a valid test" if new_test else ""
     flash(
-        "Successfully uploaded certificate "
-        f"which is valid till {user.vaccinated_till}",
+        f"Successfully uploaded {message_vaccinated}{message_and}{message_tested} 😀",
         "success",
     )
     return redirect(url_for("home"))
@@ -192,16 +219,16 @@ def upload_cert():
 def delete_cert():
     user: User = flask.g.user
 
-    if user.vaccinated_till is None:
+    if user.vaccinated_till is None and user.tested_till is None:
         flash("You don't have a certificate to delete", "danger")
         return redirect(url_for("cert"))
 
     db.session.query(User).filter(User.id == user.id).update(
-        {"vaccinated_till": None}
+        {"vaccinated_till": None, "tested_till": None}
     )
     db.session.commit()
 
-    flash("Successfully deleted your certificate", "success")
+    flash("Successfully deleted your certificate(s)", "success")
     return redirect(url_for("cert"))
 
 
@@ -350,9 +377,7 @@ def statistic():
     total_visits = Visit.query.count()
 
     cutoff_timestamp = datetime.now() - timedelta(hours=12)
-    active_visits = Visit.query.filter(
-        Visit.timestamp > cutoff_timestamp
-    ).count()
+    active_visits = Visit.query.filter(Visit.timestamp > cutoff_timestamp).count()
 
     active_users = None
     if flask.g.user is not None:
@@ -406,7 +431,7 @@ def add_login():
     req = prepare_flask_request(request)
     auth = init_saml_auth(req)
 
-    return_to = "https://covid.tust.at/"
+    return_to = "https://gv.tust.at/"
     sso_built_url = auth.login(return_to)
     session["AuthNRequestID"] = auth.get_last_request_id()
     return redirect(sso_built_url)

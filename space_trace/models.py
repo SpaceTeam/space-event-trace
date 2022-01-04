@@ -8,9 +8,8 @@ class User(db.Model):
     id: int = db.Column(db.Integer, primary_key=True)
     name: str = db.Column(db.Text, nullable=False)
     email: str = db.Column(db.Text, unique=True, nullable=False)
-    created_at: datetime = db.Column(
-        db.Date, nullable=False, default=db.func.now()
-    )
+    created_at: datetime = db.Column(db.DateTime, nullable=False, default=db.func.now())
+    tested_till: datetime = db.Column(db.DateTime, nullable=True, default=None)
     vaccinated_till: date = db.Column(db.Date, nullable=True, default=None)
 
     __table_args__ = (db.Index("idx_users_email", email),)
@@ -31,9 +30,7 @@ class Visit(db.Model):
     __tablename__ = "visits"
     id: int = db.Column(db.Integer, primary_key=True)
     user: int = db.Column(db.ForeignKey("users.id"), nullable=False)
-    timestamp: datetime = db.Column(
-        db.DateTime, nullable=False, default=db.func.now()
-    )
+    timestamp: datetime = db.Column(db.DateTime, nullable=False, default=db.func.now())
 
     __table_args__ = (db.Index("idx_visits_user", user),)
 
@@ -43,6 +40,5 @@ class Visit(db.Model):
 
     def __repr__(self):
         return (
-            f"<Visit id={self.id}, userId={self.user}, "
-            "timestamp={self.timestamp}>"
+            f"<Visit id={self.id}, userId={self.user}, " "timestamp={self.timestamp}>"
         )

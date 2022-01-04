@@ -5,7 +5,12 @@ You can only upload images of QR codes or PDFs.
 
 <form action="/cert" method="post" enctype="multipart/form-data" class="mb-5">
     <div class="mb-3 mt-2">
-        <input class="form-control" type="file" name="file" id="file" onchange="enableForm()">
+        Vaccination Certificate:
+        <input class="form-control" type="file" name="vaccineFile" id="vaccineFile" onchange="enableForm()">
+    </div>
+    <div class="mb-3 mt-2">
+        PCR Test:
+        <input class="form-control" type="file" name="testFile" id="testFile" onchange="enableForm()">
     </div>
     <div class="mb-3 form-check">
         <input type="checkbox" class="form-check-input" id="checkStorage" onchange="enableForm()">
@@ -19,11 +24,12 @@ You can only upload images of QR codes or PDFs.
 </form>
 
 <script>
-    const fileEl = document.getElementById("file");
+    const vaccineFileEl = document.getElementById("vaccineFile");
+    const testFileEl = document.getElementById("testFile");
     const checkEl = document.getElementById("checkStorage");
     const submitEl = document.getElementById("submit");
     function enableForm() {
-        if (checkEl.checked && fileEl.files.length != 0) {
+        if (checkEl.checked && (testFileEl.files.length != 0 || vaccineFileEl.files.length != 0)) {
             submitEl.disabled = false;
         } else {
             submitEl.disabled = true;
@@ -33,10 +39,14 @@ You can only upload images of QR codes or PDFs.
 
 {% if is_vaccinated %}
 <h5>Your vaccination status is valid till {{user.vaccinated_till}}.</h5>
-<form action="{{url_for('delete_cert')}}" method="post">
-    <button class="btn btn-outline-danger">Delete</button>
+{% endif %}
+{% if is_tested %}
+<h5>Your test is valid till {{user.tested_till}}.</h5>
+{% endif %}
+{% if is_tested or is_vaccinated %}
+<form class="mt-3" action="{{url_for('delete_cert')}}" method="post">
+    <button class="btn btn-outline-danger">Delete all certificates</button>
 </form>
 {% endif %}
-
 
 {% endblock %}

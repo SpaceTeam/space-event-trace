@@ -111,8 +111,7 @@ def assert_cert_sign(cose_data: bytes):
             break
     else:
         raise Exception(
-            "Unable validate certificate signature: "
-            f"kid '{required_kid}' not found"
+            "Unable validate certificate signature: " f"kid '{required_kid}' not found"
         )
     found_cert = cert
 
@@ -136,7 +135,7 @@ def assert_cert_sign(cose_data: bytes):
     print("Validated certificate :)")
 
 
-def detect_and_attach_cert(file: FileStorage, user: User) -> None:
+def detect_and_attach_vaccine_cert(file: FileStorage, user: User) -> None:
     # if the file is a pdf convert it to an image
     if file.filename.rsplit(".", 1)[1].lower() == "pdf":
         img = convert_from_bytes(file.read())[0]
@@ -146,7 +145,7 @@ def detect_and_attach_cert(file: FileStorage, user: User) -> None:
     # decode the qr code
     result = decode(img)
     if result == []:
-        raise Exception("No QR Code was detected in the image")
+        raise Exception("No QR Code was detected in the vaccine image")
 
     # decode base45
     data_zlib = base45.b45decode(result[0].data[4:])
@@ -163,16 +162,12 @@ def detect_and_attach_cert(file: FileStorage, user: User) -> None:
 
     # Verify that this is a vaccine certificate
     if "v" not in data[-260][1]:
-        message = "The certificate must be for a vaccination"
-        if "t" in data[-260][1]:
-            message += ", we don't allow tests"
-        if "r" in data[-260][1]:
-            message += ", we don't allow recovered"
+        message = "The certificate must be for a vaccine"
         raise Exception(message)
 
     # Verify the data now
     if COVID_19_ID != data[-260][1]["v"][0]["tg"]:
-        raise Exception("The certificate must be for covid19")
+        raise Exception("The vaccine certificate must be for covid19")
 
     # Verify the certificate signature
     assert_cert_sign(cose_data)
@@ -184,13 +179,80 @@ def detect_and_attach_cert(file: FileStorage, user: User) -> None:
     vaccinated_till = calc_vacinated_till(data)
     if user.vaccinated_till is not None:
         if user.vaccinated_till > vaccinated_till:
-            raise Exception("You already uploaded a newer certificate")
+            raise Exception("You already uploaded a newer vaccine certificate")
         elif user.vaccinated_till == vaccinated_till:
-            raise Exception("You already uploaded this certificate")
+            raise Exception("You already uploaded this vaccine certificate")
 
-    # Update the user
-    db.session.query(User).filter(User.id == user.id).update(
-        {"vaccinated_till": vaccinated_till}
-    )
-    user = User.query.filter(User.id == user.id).first()
-    db.session.commit()
+    user.vaccinated_till = vaccinated_till
+
+
+def detect_and_attach_test_cert(file: FileStorage, user: User) -> None:
+    # if the file is a pdf convert it to an image
+    if file.filename.rsplit(".", 1)[1].lower() == "pdf":
+        img = convert_from_bytes(file.read())[0]
+    else:
+        img = Image.open(file)
+
+    # decode the qr code
+    result = decode(img)
+    if result == []:
+        raise Exception("No QR Code was detected in the test's image")
+
+    # decode base45
+    data_zlib = base45.b45decode(result[0].data[4:])
+
+    # decompress zlib
+    cose_data = zlib.decompress(data_zlib)
+
+    # TODO: I think cbor2 is a more modern library than flynn
+    # decode cose
+    cbor_data = flynn.decoder.loads(cose_data)[1][2]
+
+    # decode cbor
+    data = flynn.decoder.loads(cbor_data)
+
+    # Verify that this is a test certificate
+    if "t" not in data[-260][1]:
+        message = "The certificate must be for a test"
+        raise Exception(message)
+
+    # Verify the data now
+    if COVID_19_ID != data[-260][1]["t"][0]["tg"]:
+        raise Exception("The certificate must be for covid19")
+    # Verify that test was negative
+    if "260415000" != data[-260][1]["t"][0]["tr"]:
+        id = data[-260][1]["t"][0]["tr"]
+        raise Exception(f"The test was not negative ({id})")
+    # Verify a pcr test
+    if "nm" not in data[-260][1]["t"][0]:
+        raise Exception("We only allow PCR tests.")
+
+    # Verify the certificate signature
+    assert_cert_sign(cose_data)
+
+    # Verify that the user belongs to that certificate
+    assert_cert_belong_to(data, user)
+
+    # Verify the expiration date is ok for the event
+    time_of_test = datetime.fromisoformat(data[-260][1]["t"][0]["sc"][:-1])
+    tested_till = time_of_test + timedelta(hours=48)
+    if tested_till < datetime.now():
+        raise Exception(
+            f"Your test is already expired.\n"
+            f"Time of test: {time_of_test}\nValid until: {time_of_test + timedelta(hours=48)}"
+        )
+    if tested_till < datetime.now() + timedelta(hours=6):
+        raise Exception(
+            f"Your test will expire in the next 6 hours\n"
+            f"Time of test: {time_of_test}\nValid until: {time_of_test + timedelta(hours=48)}"
+        )
+
+    # Verify that this test is newer than the last one
+    if user.tested_till is not None:
+        if user.tested_till > tested_till:
+            raise Exception("You already uploaded a newer test certificate")
+        elif user.tested_till == tested_till:
+            raise Exception("You already uploaded this test certificate")
+
+    # Attach expiration date to user
+    user.tested_till = tested_till

@@ -1,12 +1,8 @@
 {% extends "layout.html" %}
 {% block body %}
 <h1>Statistic</h1>
-<p>
-    <strong>{{total_users}}</strong> members are already using this tool, and
-    checked in <strong>{{total_visits}}</strong> times.
-</p>
 
-<h3>Currently in the HQ ({{active_visits}})</h3>
+<h3>Currently at the Event ({{active_visits}})</h3>
 {% if user is none %}
 🔒 <i>Only logged in users can see the names.</i>
 {% else %}
@@ -32,7 +28,7 @@
     </tbody>
 </table>
 {%else%}
-<i>There is nobody to see.</i>
+<i>There is nobody at the event yet.</i>
 {% endif %}
 {% endif %}
 {% endblock %}
