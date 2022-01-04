@@ -1,7 +1,7 @@
 # space-event-trace
 
 Tracing service for [TU Wien Spaceteam](https://spaceteam.at/?lang=en) events.
-![Screenshot](https://user-images.githubusercontent.com/21206831/144690589-8ba45b74-cd64-4dd8-8796-748f5ea0fa78.png)
+![Screenshot](https://user-images.githubusercontent.com/21206831/147995219-c73f22a5-0e8d-4809-b209-09e9d38e4219.png)
 
 This service is a special adaption of 
 [Space Trace](https://github.com/SpaceTeam/space-trace).
