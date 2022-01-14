@@ -55,7 +55,7 @@ def require_admin(f):
     @wraps(f)
     @require_login
     def wrapper(*args, **kwargs):
-        if flask.g.user.email not in app.config["ADMINS"]:
+        if not flask.g.user.is_admin():
             flash("You are not an admin, what were you thinking?", "danger")
             return redirect(url_for("home"))
 
@@ -64,31 +64,12 @@ def require_admin(f):
     return wrapper
 
 
-def require_2g_plus(f):
+def require_vaccinated(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
         user = flask.g.user
-        had_error = False
-        if user.vaccinated_till is None or user.vaccinated_till < date.today():
+        if not user.is_vaccinated():
             flash("You need to upload a vaccination certificate.", "info")
-            had_error = True
-
-        if user.tested_till is None:
-            flash("You need to upload a test certificate.", "info")
-            had_error = True
-
-        elif user.tested_till < datetime.now():
-            flash("Your test expired, you need to upload a new one.", "info")
-            had_error = True
-
-        elif user.tested_till < datetime.now() + timedelta(hours=6):
-            flash(
-                "Your test is going to expire in less than 6hrs, you need to upload a new one.",
-                "info",
-            )
-            had_error = True
-
-        if had_error:
             return redirect(url_for("cert"))
 
         return f(*args, **kwargs)
@@ -106,7 +87,7 @@ def get_active_visit(user: User) -> Visit:
 
 @app.get("/")
 @require_login
-@require_2g_plus
+@require_vaccinated
 def home():
     user: User = flask.g.user
 
@@ -134,7 +115,7 @@ def home():
 
 @app.post("/")
 @require_login
-@require_2g_plus
+@require_vaccinated
 def add_visit():
     user: User = flask.g.user
 
@@ -160,14 +141,7 @@ def cert():
         user.vaccinated_till is not None and user.vaccinated_till > date.today()
     )
 
-    is_tested = (
-        user.tested_till is not None
-        and user.tested_till > datetime.now() + timedelta(hours=6)
-    )
-
-    return render_template(
-        "cert.html", user=user, is_vaccinated=is_vaccinated, is_tested=is_tested
-    )
+    return render_template("cert.html", user=user, is_vaccinated=is_vaccinated)
 
 
 @app.post("/cert")
@@ -175,29 +149,23 @@ def cert():
 def upload_cert():
     user: User = flask.g.user
 
-    test_file = request.files["testFile"]
     vaccine_file = request.files["vaccineFile"]
 
     # If the user does not select a file, the browser submits an
     # empty file without a filename.
-    if vaccine_file.filename == "" and test_file.filename == "":
-        flash("You must at least upload one file", "danger")
+    if vaccine_file.filename == "":
+        flash("You must select a vaccine file", "danger")
         return redirect(url_for("cert"))
 
     try:
-        new_test = test_file.filename != ""
         new_vaccine = vaccine_file.filename != ""
         if new_vaccine:
             detect_and_attach_vaccine_cert(vaccine_file, user)
-
-        if new_test:
-            detect_and_attach_test_cert(test_file, user)
 
         # Update the user
         db.session.query(User).filter(User.id == user.id).update(
             {
                 "vaccinated_till": user.vaccinated_till,
-                "tested_till": user.tested_till,
             }
         )
         db.session.commit()
@@ -212,10 +180,8 @@ def upload_cert():
         return redirect(request.url)
 
     message_vaccinated = "a valid vaccination certificate" if new_vaccine else ""
-    message_and = " and " if new_vaccine and new_test else ""
-    message_tested = "a valid test" if new_test else ""
     flash(
-        f"Successfully uploaded {message_vaccinated}{message_and}{message_tested} 😀",
+        f"Successfully uploaded {message_vaccinated} 😀",
         "success",
     )
     return redirect(url_for("home"))
@@ -226,17 +192,35 @@ def upload_cert():
 def delete_cert():
     user: User = flask.g.user
 
-    if user.vaccinated_till is None and user.tested_till is None:
+    if user.vaccinated_till is None:
         flash("You don't have a certificate to delete", "danger")
         return redirect(url_for("cert"))
 
-    db.session.query(User).filter(User.id == user.id).update(
-        {"vaccinated_till": None, "tested_till": None}
+    db.session.query(User).filter(User.id == user.id).update({"vaccinated_till": None})
+    db.session.commit()
+
+    flash("Successfully deleted your certificate", "success")
+    return redirect(url_for("cert"))
+
+
+@app.post("/whitelist-user")
+@require_login
+@require_admin
+def whitelist_user():
+    whitelist_id = int(request.form["whitelistId"])
+    whitelisted_till = datetime.now() + timedelta(days=1)
+    db.session.query(User).filter(User.id == whitelist_id).update(
+        {"vaccinated_till": whitelisted_till}
     )
     db.session.commit()
 
-    flash("Successfully deleted your certificate(s)", "success")
-    return redirect(url_for("cert"))
+    user = db.session.query(User).filter(User.id == whitelist_id).first()
+
+    flash(
+        f"Successfully whitelisted {user.full_name()} until {whitelisted_till}",
+        "success",
+    )
+    return redirect(url_for("admin"))
 
 
 @app.get("/admin")

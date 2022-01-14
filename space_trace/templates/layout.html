@@ -44,6 +44,9 @@
             <a href="{{url_for('statistic')}}" class="tab-link">Statistic</a> ·
             {% if user is defined and user is not none %}
             <a href="{{url_for('cert')}}" class="tab-link">Certificate</a> ·
+            {% if user.is_admin() %}
+            <a href="{{url_for('admin')}}" class="tab-link">Admin</a> ·
+            {% endif %}
             <a href="{{url_for('logout')}}" class="tab-link">Logout</a>
             {% else %}
             <a href="{{url_for('login')}}" class="tab-link">Login</a>

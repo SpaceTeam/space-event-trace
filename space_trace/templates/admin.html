@@ -50,6 +50,27 @@ This means they start at 00:00 and end at 23:59.
 </script>
 
 <p>
+<h3 class="mt-5">Temporary Whitelist</h3>
+<form action="{{url_for('whitelist_user')}}" method="post" class="row g-3 mt-2">
+    <div class="col-md-12">
+        <label for="whitelistId" class="form-label">Person to be whitelisted</label>
+        <select id="whitelistId" name="whitelistId" class="form-select" aria-label="Default select example"
+            onchange="whitelistChangeListener()">
+            <option value="" selected>Select person</option>
+            {% for user in users%}
+            <option value="{{user.id}}">{{user.full_name()}}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+
+    <div class="col-12">
+        <button class=" btn btn-primary" id="whitelistButton" disabled onclick="">Whitelist</button>
+    </div>
+</form>
+</p>
+
+<p>
 <h3 class="mt-5">Smart contact export</h3>
 <form action="{{url_for('smart_contacts_csv')}}" method="get" class="row g-3 mt-2">
     <div class="col-md-4">
@@ -62,7 +83,7 @@ This means they start at 00:00 and end at 23:59.
             onchange="smartChangeListener()">
             <option value="" selected>Select person</option>
             {% for user in users%}
-            <option value="{{user.id}}">{{user.get_full_name()}}</option>
+            <option value="{{user.id}}">{{user.full_name()}}</option>
             {% endfor %}
         </select>
     </div>
@@ -85,6 +106,18 @@ This means they start at 00:00 and end at 23:59.
             return;
         }
         smartExportEl.disabled = false;
+    }
+</script>
+<script>
+    const whitelistEl = document.getElementById("whitelistId");
+    const whitelistButtonEl = document.getElementById("whitelistButton");
+
+    function whitelistChangeListener() {
+        if (whitelistEl.value == "") {
+            whitelistButtonEl.disabled = true;
+            return;
+        }
+        whitelistButtonEl.disabled = false;
     }
 </script>
 
