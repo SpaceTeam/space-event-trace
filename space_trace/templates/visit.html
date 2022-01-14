@@ -11,7 +11,9 @@ to enter the event you need to register for contact-tracing.
 </form>
 {% else %}
 <h1>Checked in 👍</h1>
-{{user.name}}, you are now registered for the event.
+{{user.name}}, you are now registered for the event.<br>
+Your seat is in row {{seat.row}} number {{seat.number}}.
+
 <br>
 {% endif %}
 

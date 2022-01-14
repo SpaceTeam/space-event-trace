@@ -7,6 +7,10 @@ SAML_PATH="space_trace/saml"
 SQLALCHEMY_DATABASE_URI="sqlite:///../instance/trace.db"
 SQLALCHEMY_TRACK_MODIFICATIONS=false
 
+# numbers of seats pro row (starting by 1), numbers of rows (starting by 1)
+SEAT_NUMBERS=8
+SEAT_ROWS=8
+
 # Here are the admins defined of this application. Only these users have the 
 # ability to export members in case of a corona case.
 # IMPORTANT! this also means the have access to basically all peronal data this

@@ -18,7 +18,7 @@ from space_trace.certificates import (
     detect_and_attach_test_cert,
     detect_and_attach_vaccine_cert,
 )
-from space_trace.models import User, Visit
+from space_trace.models import User, Visit, Seat
 
 
 def maybe_load_user(f):
@@ -96,6 +96,8 @@ def home():
     if visit is not None:
         visit_deadline = visit.timestamp + timedelta(hours=12)
 
+    seat = Seat.query.filter(Seat.user == user.id).first()
+
     expires_in = user.vaccinated_till - date.today()
     if expires_in < timedelta(days=21):
         color = "warning" if expires_in > timedelta(days=7) else "danger"
@@ -110,6 +112,7 @@ def home():
         visit=visit,
         visit_deadline=visit_deadline,
         joke="",
+        seat=seat,
     )
 
 
@@ -128,6 +131,13 @@ def add_visit():
     # Create a new visit
     visit = Visit(datetime.now(), user.id)
     db.session.add(visit)
+    seat = (
+        db.session.query(Seat)
+        .filter(Seat.user == None)
+        .order_by(Seat.row, Seat.number.desc())
+        .first()
+    )
+    db.session.query(Seat).filter(Seat.id == seat.id).update({"user": user.id})
     db.session.commit()
     return redirect(url_for("home"))
 

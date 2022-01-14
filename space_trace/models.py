@@ -49,3 +49,20 @@ class Visit(db.Model):
         return (
             f"<Visit id={self.id}, userId={self.user}, " "timestamp={self.timestamp}>"
         )
+
+
+class Seat(db.Model):
+    __tablename__ = "seats"
+    id: int = db.Column(db.Integer, primary_key=True)
+    user: int = db.Column(db.ForeignKey("users.id"), nullable=True)
+    row: int = db.Column(db.Integer, nullable=False)
+    number: int = db.Column(db.Integer, nullable=False)
+
+    __table_args__ = (db.Index("idx_seats_user", user),)
+
+    def __init__(self, row: int, number: int):
+        self.row = row
+        self.number = number
+
+    def __repr__(self):
+        return f"<Seat id={self.id}, userId={self.user}, row={self.row}, number={self.number} >"

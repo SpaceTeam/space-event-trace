@@ -40,3 +40,6 @@ However, the db schema is slightly different and this script adapts it from
 This sql statement decrements the expiration dates of all vaccines in case
 the government changes those dates.
 sudo 
+
+## flask create-db
+The create db will create enough seats (as specified in the config).
