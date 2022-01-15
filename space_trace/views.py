@@ -3,6 +3,7 @@ from functools import wraps
 from io import StringIO
 from traceback import format_exception
 import csv
+from typing import List, Tuple
 
 import flask
 from flask import session, redirect, url_for, request, flash, abort
@@ -102,7 +103,8 @@ def home():
     if expires_in < timedelta(days=21):
         color = "warning" if expires_in > timedelta(days=7) else "danger"
         flash(
-            "Your vaccination certificate will expire " f"in {expires_in.days} days.",
+            "Your vaccination certificate will expire "
+            f"in {expires_in.days} days.",
             color,
         )
 
@@ -137,6 +139,10 @@ def add_visit():
         .order_by(Seat.row, Seat.number.desc())
         .first()
     )
+    if seat is None:
+        flash("There are no seats left", "danger")
+        return redirect(url_for("home"))
+
     db.session.query(Seat).filter(Seat.id == seat.id).update({"user": user.id})
     db.session.commit()
     return redirect(url_for("home"))
@@ -148,7 +154,8 @@ def cert():
     user: User = flask.g.user
 
     is_vaccinated = (
-        user.vaccinated_till is not None and user.vaccinated_till > date.today()
+        user.vaccinated_till is not None
+        and user.vaccinated_till > date.today()
     )
 
     return render_template("cert.html", user=user, is_vaccinated=is_vaccinated)
@@ -189,7 +196,9 @@ def upload_cert():
         flash(message, "danger")
         return redirect(request.url)
 
-    message_vaccinated = "a valid vaccination certificate" if new_vaccine else ""
+    message_vaccinated = (
+        "a valid vaccination certificate" if new_vaccine else ""
+    )
     flash(
         f"Successfully uploaded {message_vaccinated} 😀",
         "success",
@@ -206,7 +215,9 @@ def delete_cert():
         flash("You don't have a certificate to delete", "danger")
         return redirect(url_for("cert"))
 
-    db.session.query(User).filter(User.id == user.id).update({"vaccinated_till": None})
+    db.session.query(User).filter(User.id == user.id).update(
+        {"vaccinated_till": None}
+    )
     db.session.commit()
 
     flash("Successfully deleted your certificate", "success")
@@ -371,6 +382,14 @@ def help():
     return render_template("help.html", user=flask.g.user)
 
 
+def zip_users_seats(users, seats) -> List[Tuple[User, Seat]]:
+    lookup = dict()
+    for seat in seats:
+        lookup[seat.id] = seat
+
+    return list(map(lambda u: (u, lookup[u.id]), users))
+
+
 @app.get("/statistic")
 @maybe_load_user
 def statistic():
@@ -378,7 +397,9 @@ def statistic():
     total_visits = Visit.query.count()
 
     cutoff_timestamp = datetime.now() - timedelta(hours=3)
-    active_visits = Visit.query.filter(Visit.timestamp > cutoff_timestamp).count()
+    active_visits = Visit.query.filter(
+        Visit.timestamp > cutoff_timestamp
+    ).count()
 
     active_users = None
     if flask.g.user is not None:
@@ -388,11 +409,17 @@ def statistic():
             .filter(Visit.timestamp > cutoff_timestamp)
             .all()
         )
+        seats = db.session.query(Seat).filter(Seat.id is not None).all()
+
+        zipped = zip_users_seats(users, seats)
 
         active_users = []
-        for user in users:
-            first, last = user.email.split("@")[0].split(".")
-            active_users.append((first.capitalize(), last.capitalize()))
+        for entry in zipped:
+            (user, seat) = entry
+            seat_text = f"row {seat.row}, number {seat.number}"
+            active_users.append(
+                (user.first_name(), user.last_name(), seat_text)
+            )
 
         active_users = sorted(active_users, key=lambda n: n[0])
 
