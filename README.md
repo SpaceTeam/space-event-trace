@@ -41,8 +41,16 @@ Create a virtual env with:
 python3 -m venv venv
 ```
 
+You maybe want to copy over the vaccine status of all users from 
+[space trace](https://github.com/SpaceTeam/space-trace). In that case you can
+just copy the sqlite file from spacetrace and run the script in 
+`scripts/migrate_db.sql`.
+
 Copy `instance/config_example.toml` to `instance/config.toml` and edit all
 the fields in it.
+
+The seats in the database need to be created manually. To create them run
+`FLASK_APP=space_trace FLASK_ENV=development flask create-db`.
 
 Open `space-event-trace.service` and edit the username and all paths to the working
 directory.
