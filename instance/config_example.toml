@@ -7,7 +7,7 @@ SAML_PATH="space_trace/saml"
 SQLALCHEMY_DATABASE_URI="sqlite:///../instance/trace.db"
 SQLALCHEMY_TRACK_MODIFICATIONS=false
 
-# numbers of seats pro row (starting by 1), numbers of rows (starting by 1)
+# Numbers of seats per row (starting by 1), numbers of rows (starting by 1)
 SEAT_NUMBERS=8
 SEAT_ROWS=8
 
