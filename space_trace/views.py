@@ -385,7 +385,7 @@ def help():
 def zip_users_seats(users, seats) -> List[Tuple[User, Seat]]:
     lookup = dict()
     for seat in seats:
-        lookup[seat.id] = seat
+        lookup[seat.user] = seat
 
     return list(map(lambda u: (u, lookup[u.id]), users))
 

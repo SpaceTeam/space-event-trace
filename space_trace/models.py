@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from enum import unique
 from space_trace import db, app
 
 
@@ -74,7 +75,9 @@ class Visit(db.Model):
 class Seat(db.Model):
     __tablename__ = "seats"
     id: int = db.Column(db.Integer, primary_key=True)
-    user: int = db.Column(db.ForeignKey("users.id"), nullable=True)
+    user: int = db.Column(
+        db.ForeignKey("users.id"), nullable=True, unique=True
+    )
     row: int = db.Column(db.Integer, nullable=False)
     number: int = db.Column(db.Integer, nullable=False)
 
