@@ -1,5 +1,4 @@
 from datetime import date, datetime
-from enum import unique
 from space_trace import db, app
 
 

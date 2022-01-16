@@ -43,3 +43,6 @@ sudo
 
 ## flask create-db
 The create db will create enough seats (as specified in the config).
+
+## reset_visits.sql
+Deletes all visits and resets the seats.

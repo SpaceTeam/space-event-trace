@@ -9,14 +9,12 @@ import flask
 from flask import session, redirect, url_for, request, flash, abort
 from flask.helpers import make_response
 from flask.templating import render_template
-from sqlalchemy.exc import IntegrityError
 from onelogin.saml2.auth import OneLogin_Saml2_Auth
 from onelogin.saml2.utils import OneLogin_Saml2_Utils
 from werkzeug.exceptions import InternalServerError
 
 from space_trace import app, db
 from space_trace.certificates import (
-    detect_and_attach_test_cert,
     detect_and_attach_vaccine_cert,
 )
 from space_trace.models import User, Visit, Seat
@@ -79,11 +77,7 @@ def require_vaccinated(f):
 
 
 def get_active_visit(user: User) -> Visit:
-    # A visit that is less than 12h old
-    cutoff_timestamp = datetime.now() - timedelta(hours=3)
-    return Visit.query.filter(
-        db.and_(Visit.user == user.id, Visit.timestamp > cutoff_timestamp)
-    ).first()
+    return Visit.query.filter(db.and_(Visit.user == user.id)).first()
 
 
 @app.get("/")
@@ -93,9 +87,6 @@ def home():
     user: User = flask.g.user
 
     visit = get_active_visit(user)
-    visit_deadline = None
-    if visit is not None:
-        visit_deadline = visit.timestamp + timedelta(hours=12)
 
     seat = Seat.query.filter(Seat.user == user.id).first()
 
@@ -112,8 +103,6 @@ def home():
         "visit.html",
         user=user,
         visit=visit,
-        visit_deadline=visit_deadline,
-        joke="",
         seat=seat,
     )
 
@@ -122,6 +111,12 @@ def home():
 @require_login
 @require_vaccinated
 def add_visit():
+    # Check if the event has even started
+    starttime = datetime.fromisoformat(app.config["EVENT_START"])
+    if datetime.now() < starttime:
+        flash(f"Event registration will start at: {starttime}", "danger")
+        return redirect(url_for("home"))
+
     user: User = flask.g.user
 
     # Don't enter a visit if there is already one for today
@@ -229,18 +224,25 @@ def delete_cert():
 @require_admin
 def whitelist_user():
     whitelist_id = int(request.form["whitelistId"])
-    whitelisted_till = datetime.now() + timedelta(days=1)
-    db.session.query(User).filter(User.id == whitelist_id).update(
-        {"vaccinated_till": whitelisted_till}
-    )
+    whitelisted_till = date.today() + timedelta(days=1)
+    db.session.query(User).filter(User.id == whitelist_id).filter(
+        User.vaccinated_till < whitelisted_till
+    ).update({"vaccinated_till": whitelisted_till})
     db.session.commit()
 
     user = db.session.query(User).filter(User.id == whitelist_id).first()
 
-    flash(
-        f"Successfully whitelisted {user.full_name()} until {whitelisted_till}",
-        "success",
-    )
+    if user.vaccinated_till == whitelisted_till:
+        flash(
+            f"Successfully whitelisted {user.full_name()} until {whitelisted_till}",
+            "success",
+        )
+    else:
+        flash(
+            f"{user.full_name()} already has a vaccine certificate valid till: {user.vaccinated_till}",
+            "warning",
+        )
+
     return redirect(url_for("admin"))
 
 
@@ -393,24 +395,12 @@ def zip_users_seats(users, seats) -> List[Tuple[User, Seat]]:
 @app.get("/statistic")
 @maybe_load_user
 def statistic():
-    total_users = User.query.count()
-    total_visits = Visit.query.count()
 
-    cutoff_timestamp = datetime.now() - timedelta(hours=3)
-    active_visits = Visit.query.filter(
-        Visit.timestamp > cutoff_timestamp
-    ).count()
+    users = db.session.query(User).filter(User.id == Visit.user).all()
+    seats = db.session.query(Seat).filter(Seat.id is not None).all()
 
     active_users = None
     if flask.g.user is not None:
-        users = (
-            db.session.query(User)
-            .filter(User.id == Visit.user)
-            .filter(Visit.timestamp > cutoff_timestamp)
-            .all()
-        )
-        seats = db.session.query(Seat).filter(Seat.id is not None).all()
-
         zipped = zip_users_seats(users, seats)
 
         active_users = []
@@ -426,10 +416,8 @@ def statistic():
     return render_template(
         "statistic.html",
         user=flask.g.user,
-        total_users=total_users,
-        total_visits=total_visits,
-        active_visits=active_visits,
         active_users=active_users,
+        active_visits=len(users),
     )
 
 

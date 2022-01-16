@@ -11,6 +11,9 @@ SQLALCHEMY_TRACK_MODIFICATIONS=false
 SEAT_NUMBERS=8
 SEAT_ROWS=8
 
+# Registration for the event is only possible after the event started.
+EVENT_START = "2022-01-17T18:00:00"
+
 # Here are the admins defined of this application. Only these users have the 
 # ability to export members in case of a corona case.
 # IMPORTANT! this also means the have access to basically all peronal data this
